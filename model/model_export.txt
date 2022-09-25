@@ -1,0 +1,7 @@
+cd E:\Paddle\PaddleDetection2.4   
+
+paddle2onnx --model_dir inference_model/picodet_v2_s_192_pedestrian --model_filename model.pdmodel --params_filename model.pdiparams --opset_version 11 --save_file picodet_v2_s_192_pedestrian.onnx
+
+
+
+paddle2onnx --model_dir inference_model/tinypose_128x96 --model_filename model.pdmodel --params_filename model.pdiparams --opset_version 11 --save_file tinypose_128_96.onnx
