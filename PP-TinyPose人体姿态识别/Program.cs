@@ -27,7 +27,7 @@ namespace OpenVinoSharpPPTinyPose
 
 
             // 测试图片
-            string image_path = @"E:\Git_space\基于Csharp和OpenVINO部署PP-TinyPose\image\demo_3.jpg";
+            string image_path = @"E:\Git_space\基于Csharp和OpenVINO部署PP-TinyPose\image\demo_4.jpg";
 
             Mat image = Cv2.ImRead(image_path);
 
@@ -37,8 +37,12 @@ namespace OpenVinoSharpPPTinyPose
             PicoDet picoDet = new PicoDet(mode_path_det, device_name);
 
             Size size_det = new Size(192, 192);
-            picoDet.predict(image,size_det);
-
+            picoDet.set_shape(size_det, 765);
+            List<Mat> image_dets = picoDet.predict(image);
+            for (int i = 0; i < image_dets.Count; i++) {
+                Cv2.ImShow(i.ToString(), image_dets[i]);
+            }
+            Cv2.WaitKey(0);
 
 
             Console.WriteLine("qwert");
