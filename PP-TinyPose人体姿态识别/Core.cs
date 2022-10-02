@@ -72,6 +72,12 @@ namespace OpenVinoSharpPPTinyPose
                 result = (T[])Convert.ChangeType(inference_result, typeof(T[]));
                 return result;
             }
+            else if (t == "System.Int64") {
+                long[] inference_result = new long[data_size];
+                NativeMethods.read_infer_result_I64(ptr, output_node_name, data_size, ref inference_result[0]);
+                result = (T[])Convert.ChangeType(inference_result, typeof(T[]));
+                return result;
+            }
             else { // 读取数据类型为浮点型数据
                 float[] inference_result = new float[data_size];
                 NativeMethods.read_infer_result_F32(ptr, output_node_name, data_size, ref inference_result[0]);

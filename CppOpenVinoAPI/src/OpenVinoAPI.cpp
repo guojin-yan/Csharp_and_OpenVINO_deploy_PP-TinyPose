@@ -63,6 +63,8 @@ void fill_tensor_data_image(ov::Tensor& input_tensor, const cv::Mat& input_image
     const size_t channels = tensor_shape[1]; // 要求输入图片数据的维度
     // 读取节点数据内存指针
     float* input_tensor_data = input_tensor.data<float>();
+    std::cout << std::endl;
+    std::cout << input_image.at<cv::Vec<float, 3>>(0, 0)[0] << std::endl;
     // 将图片数据填充到网络中
     // 原有图片数据为 H、W、C 格式，输入要求的为 C、H、W 格式
     for (size_t c = 0; c < channels; c++) {
@@ -86,6 +88,41 @@ void fill_tensor_data_float(ov::Tensor& input_tensor, float* input_data, int dat
     }
 }
 
+
+cv::Mat get_affine_transform(cv::Point center, cv::Size input_size, int rot, cv::Size output_size, cv::Point2f shift = cv::Point2f(0,0)){
+    
+    // 输入尺寸宽度
+    int src_w = input_size.width;
+    
+    // 输出尺寸
+    int dst_w = output_size.width;
+    int dst_h = output_size.height;
+
+    // 旋转角度
+    float rot_rad = 3.1715926f * rot / 180.0;
+    int pt = (int)src_w * -0.5;
+    float sn = std::sin(rot_rad);
+    float cs = std::cos(rot_rad);
+    
+    cv::Point2f src_dir(-1.0 * pt * sn, pt * cs);
+    std::cout << "src_dir: " << src_dir << std::endl;
+    cv::Point2f dst_dir(0.0, dst_w * -0.5);
+    cv::Point2f src[3];
+    src[0] = cv::Point2f(center.x + input_size.width * shift.x, center.y + input_size.height * shift.y);
+    src[1] = cv::Point2f(center.x + src_dir.x + input_size.width * shift.x, center.y + src_dir.y + input_size.height * shift.y);
+    cv::Point2f direction = src[0] - src[1];
+    src[2] = cv::Point2f(src[1].x - direction.y, src[1].y - direction.x);
+
+    cv::Point2f dst[3];
+    dst[0] = cv::Point2f(dst_w * 0.5, dst_h * 0.5);
+    dst[1] = cv::Point2f(dst_w * 0.5 + dst_dir.x, dst_h * 0.5 + dst_dir.y);
+    direction = dst[0] - dst[1];
+    dst[2] = cv::Point2f(dst[1].x - direction.y, dst[1].y - direction.x);
+
+
+   return cv::getAffineTransform(src, dst);
+
+}
 
 
 // @brief 推理核心结构体
@@ -164,14 +201,19 @@ extern "C"  __declspec(dllexport) void* __stdcall load_image_input_data(void* co
     ov::Tensor input_image_tensor = p->infer_request.get_tensor(input_node_name);
     int input_H = input_image_tensor.get_shape()[2]; //获得"image"节点的Height
     int input_W = input_image_tensor.get_shape()[3]; //获得"image"节点的Width
+    std::cout << "bath_size: " << input_image_tensor.get_shape()[0];
+    std::cout << "  chance: " << input_image_tensor.get_shape()[1];
+    std::cout << "  input_H: " << input_image_tensor.get_shape()[2];
+    std::cout << "  input_W: " << input_image_tensor.get_shape()[3];
 
     // 对输入图片进行预处理
     cv::Mat input_image = data_to_mat(image_data, image_size); // 读取输入图片
     cv::Mat blob_image;
     cv::cvtColor(input_image, blob_image, cv::COLOR_BGR2RGB); // 将图片通道由 BGR 转为 RGB
-    // 对输入图片按照tensor输入要求进行缩放
-    cv::resize(blob_image, blob_image, cv::Size(input_W, input_H), 0, 0, cv::INTER_LINEAR);
+
     if (type == 0) {   
+        // 对输入图片按照tensor输入要求进行缩放
+        cv::resize(blob_image, blob_image, cv::Size(input_W, input_H), 0, 0, cv::INTER_LINEAR);
         // 图像数据归一化，减均值mean，除以方差std
         // PaddleDetection模型使用imagenet数据集的均值 Mean = [0.485, 0.456, 0.406]和方差 std = [0.229, 0.224, 0.225]
         std::vector<float> mean_values{ 0.485 * 255, 0.456 * 255, 0.406 * 255 };
@@ -185,6 +227,41 @@ extern "C"  __declspec(dllexport) void* __stdcall load_image_input_data(void* co
         cv::merge(rgb_channels, blob_image); // 合并图片数据通道
     }
     else if (type == 1) {
+        // 对输入图片按照tensor输入要求进行缩放
+        cv::resize(blob_image, blob_image, cv::Size(input_W, input_H), 0, 0, cv::INTER_LINEAR);
+        // 图像数据归一化
+        std::vector<float> mean_values{ 0.5 * 255, 0.5 * 255, 0.5 * 255 };
+        std::vector<float> std_values{ 0.5 * 255, 0.5 * 255, 0.5 * 255 };
+        std::vector<cv::Mat> rgb_channels(3);
+        cv::split(blob_image, rgb_channels); // 分离图片数据通道
+        for (auto i = 0; i < rgb_channels.size(); i++) {
+            //分通道依此对每一个通道数据进行归一化处理
+            rgb_channels[i].convertTo(rgb_channels[i], CV_32FC1, 1.0 / std_values[i], (0.0 - mean_values[i]) / std_values[i]);
+        }
+        cv::merge(rgb_channels, blob_image); // 合并图片数据通道
+    }
+    else if (type == 2) {
+        cv::Point center(blob_image.cols / 2, blob_image.rows / 2);
+        std::cout <<"center"<< center<< std::endl;
+        cv::Size input_size(blob_image.cols, blob_image.rows);
+        std::cout << "input_size" << input_size << std::endl;
+        int rot = 0;
+        cv::Size output_size(input_W, input_H);
+        std::cout << "output_size" << output_size << std::endl;
+        cv::Mat warp_mat(2, 3, CV_32FC1);
+
+        warp_mat = get_affine_transform(center, input_size, rot, output_size);
+        std::cout << std::endl;
+        for (int i = 0; i < 2; i++) {
+            for (int j = 0; j < 3; j++) {
+                std::cout << warp_mat.at<cv::Vec<double, 1>>(i, j) << "  ";
+            }
+            std::cout << std::endl;
+        }
+
+        cv::warpAffine(blob_image, blob_image, warp_mat, output_size, cv::INTER_LINEAR);
+        //cv::imshow("sss", blob_image);
+        //cv::waitKey(0);
         // 图像数据归一化
         std::vector<float> mean_values{ 0.5 * 255, 0.5 * 255, 0.5 * 255 };
         std::vector<float> std_values{ 0.5 * 255, 0.5 * 255, 0.5 * 255 };
@@ -225,8 +302,10 @@ extern "C"  __declspec(dllexport) void* __stdcall load_input_data(void* core_ptr
 extern "C"  __declspec(dllexport) void* __stdcall core_infer(void* core_ptr) {
     // 读取推理模型地址
     CoreStruct* p = (CoreStruct*)core_ptr;
+    std::cout << "开始" << std::endl;
     // 模型预测
     p->infer_request.infer();
+    std::cout << "结束" << std::endl;
 
     return (void*)p;
 }
@@ -242,6 +321,7 @@ extern "C"  __declspec(dllexport) void __stdcall read_infer_result_F32(void* cor
     std::string output_node_name = wchar_to_string(output_node_name_wchar);
     // 读取指定节点的tensor
     const ov::Tensor& output_tensor = p->infer_request.get_tensor(output_node_name);
+    std::cout << " output_tensor.get_shape() ：" << output_tensor.get_shape() << std::endl;
     // 获取网络节点数据地址
     const float* results = output_tensor.data<const float>();
     // 将输出结果复制到输出地址指针中
@@ -262,6 +342,7 @@ extern "C"  __declspec(dllexport) void __stdcall read_infer_result_I32(void* cor
     std::string output_node_name = wchar_to_string(output_node_name_wchar);
     // 读取指定节点的tensor
     const ov::Tensor& output_tensor = p->infer_request.get_tensor(output_node_name);
+    std::cout << " output_tensor.get_shape() ：" << output_tensor.get_shape() << std::endl;
     // 获取网络节点数据地址
     const int* results = output_tensor.data<const int>();
     // 将输出结果赋值到输出地址指针中
@@ -270,6 +351,28 @@ extern "C"  __declspec(dllexport) void __stdcall read_infer_result_I32(void* cor
         infer_result++;
     }
 }
+
+// @brief 查询long long类型的推理结果
+// @param inference_engine 推理核心指针
+// @param output_node_name_wchar 输出节点名
+// @param data_size 数据长度
+// @param [out]  inference_result 推理结果数组
+extern "C"  __declspec(dllexport) void __stdcall read_infer_result_I64(void* core_ptr, const wchar_t* output_node_name_wchar, int data_size, long long* infer_result) {
+    // 读取推理模型地址
+    CoreStruct* p = (CoreStruct*)core_ptr;
+    std::string output_node_name = wchar_to_string(output_node_name_wchar);
+    // 读取指定节点的tensor
+    const ov::Tensor& output_tensor = p->infer_request.get_tensor(output_node_name);
+    std::cout << " output_tensor.get_shape() ：" << output_tensor.get_shape() << std::endl;
+    // 获取网络节点数据地址
+    const long long * results = output_tensor.data<const long long>();
+    // 将输出结果赋值到输出地址指针中
+    for (int i = 0; i < data_size; i++) {
+        *infer_result = results[i];
+        infer_result++;
+    }
+}
+
 
 // @brief 删除推理核心结构体指针，释放占用内存
 // @param inference_engine 推理核心指针

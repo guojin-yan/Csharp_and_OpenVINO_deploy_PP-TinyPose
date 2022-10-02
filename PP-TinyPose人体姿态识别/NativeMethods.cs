@@ -31,6 +31,8 @@ namespace OpenVinoSharpPPTinyPose
 
         [DllImport(openvino_dll_path, CharSet = CharSet.Unicode, CallingConvention = CallingConvention.Cdecl)]
         public extern static void read_infer_result_I32(IntPtr inference_engine, string output_node_name, int data_size, ref int inference_result);
+        [DllImport(openvino_dll_path, CharSet = CharSet.Unicode, CallingConvention = CallingConvention.Cdecl)]
+        public extern static void read_infer_result_I64(IntPtr inference_engine, string output_node_name, int data_size, ref long inference_result);
 
         [DllImport(openvino_dll_path, CharSet = CharSet.Unicode, CallingConvention = CallingConvention.Cdecl)]
         public extern static void core_delet(IntPtr inference_engine);

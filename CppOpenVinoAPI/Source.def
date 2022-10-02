@@ -9,4 +9,5 @@ EXPORTS
 		core_infer
 		read_infer_result_F32
 		read_infer_result_I32
+		read_infer_result_I64
 		core_delet
