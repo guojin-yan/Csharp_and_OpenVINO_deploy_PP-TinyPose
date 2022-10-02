@@ -63,8 +63,6 @@ void fill_tensor_data_image(ov::Tensor& input_tensor, const cv::Mat& input_image
     const size_t channels = tensor_shape[1]; // 要求输入图片数据的维度
     // 读取节点数据内存指针
     float* input_tensor_data = input_tensor.data<float>();
-    std::cout << std::endl;
-    std::cout << input_image.at<cv::Vec<float, 3>>(0, 0)[0] << std::endl;
     // 将图片数据填充到网络中
     // 原有图片数据为 H、W、C 格式，输入要求的为 C、H、W 格式
     for (size_t c = 0; c < channels; c++) {
@@ -88,7 +86,13 @@ void fill_tensor_data_float(ov::Tensor& input_tensor, float* input_data, int dat
     }
 }
 
-
+// @brief 构建放射变换矩阵
+// @param center 中心点
+// @param input_size 输入尺寸
+// @param rot 角度
+// @param output_size 输出尺寸
+// @param shift 
+// @rrturn 变换矩阵
 cv::Mat get_affine_transform(cv::Point center, cv::Size input_size, int rot, cv::Size output_size, cv::Point2f shift = cv::Point2f(0,0)){
     
     // 输入尺寸宽度
@@ -105,22 +109,21 @@ cv::Mat get_affine_transform(cv::Point center, cv::Size input_size, int rot, cv:
     float cs = std::cos(rot_rad);
     
     cv::Point2f src_dir(-1.0 * pt * sn, pt * cs);
-    std::cout << "src_dir: " << src_dir << std::endl;
     cv::Point2f dst_dir(0.0, dst_w * -0.5);
+    // 输入三个点
     cv::Point2f src[3];
     src[0] = cv::Point2f(center.x + input_size.width * shift.x, center.y + input_size.height * shift.y);
     src[1] = cv::Point2f(center.x + src_dir.x + input_size.width * shift.x, center.y + src_dir.y + input_size.height * shift.y);
     cv::Point2f direction = src[0] - src[1];
     src[2] = cv::Point2f(src[1].x - direction.y, src[1].y - direction.x);
-
+    // 输出三个点
     cv::Point2f dst[3];
     dst[0] = cv::Point2f(dst_w * 0.5, dst_h * 0.5);
     dst[1] = cv::Point2f(dst_w * 0.5 + dst_dir.x, dst_h * 0.5 + dst_dir.y);
     direction = dst[0] - dst[1];
     dst[2] = cv::Point2f(dst[1].x - direction.y, dst[1].y - direction.x);
 
-
-   return cv::getAffineTransform(src, dst);
+    return cv::getAffineTransform(src, dst);
 
 }
 
@@ -201,10 +204,6 @@ extern "C"  __declspec(dllexport) void* __stdcall load_image_input_data(void* co
     ov::Tensor input_image_tensor = p->infer_request.get_tensor(input_node_name);
     int input_H = input_image_tensor.get_shape()[2]; //获得"image"节点的Height
     int input_W = input_image_tensor.get_shape()[3]; //获得"image"节点的Width
-    std::cout << "bath_size: " << input_image_tensor.get_shape()[0];
-    std::cout << "  chance: " << input_image_tensor.get_shape()[1];
-    std::cout << "  input_H: " << input_image_tensor.get_shape()[2];
-    std::cout << "  input_W: " << input_image_tensor.get_shape()[3];
 
     // 对输入图片进行预处理
     cv::Mat input_image = data_to_mat(image_data, image_size); // 读取输入图片
@@ -241,30 +240,20 @@ extern "C"  __declspec(dllexport) void* __stdcall load_image_input_data(void* co
         cv::merge(rgb_channels, blob_image); // 合并图片数据通道
     }
     else if (type == 2) {
-        cv::Point center(blob_image.cols / 2, blob_image.rows / 2);
-        std::cout <<"center"<< center<< std::endl;
-        cv::Size input_size(blob_image.cols, blob_image.rows);
-        std::cout << "input_size" << input_size << std::endl;
-        int rot = 0;
-        cv::Size output_size(input_W, input_H);
-        std::cout << "output_size" << output_size << std::endl;
+        // 获取仿射变换信息
+        cv::Point center(blob_image.cols / 2, blob_image.rows / 2); // 变换中心
+        cv::Size input_size(blob_image.cols, blob_image.rows); // 输入尺寸
+        int rot = 0; // 角度
+        cv::Size output_size(input_W, input_H); // 输出尺寸
+
+        // 获取仿射变换矩阵
         cv::Mat warp_mat(2, 3, CV_32FC1);
-
         warp_mat = get_affine_transform(center, input_size, rot, output_size);
-        std::cout << std::endl;
-        for (int i = 0; i < 2; i++) {
-            for (int j = 0; j < 3; j++) {
-                std::cout << warp_mat.at<cv::Vec<double, 1>>(i, j) << "  ";
-            }
-            std::cout << std::endl;
-        }
-
+        // 仿射变化
         cv::warpAffine(blob_image, blob_image, warp_mat, output_size, cv::INTER_LINEAR);
-        //cv::imshow("sss", blob_image);
-        //cv::waitKey(0);
         // 图像数据归一化
-        std::vector<float> mean_values{ 0.5 * 255, 0.5 * 255, 0.5 * 255 };
-        std::vector<float> std_values{ 0.5 * 255, 0.5 * 255, 0.5 * 255 };
+        std::vector<float> mean_values{ 0.485 * 255, 0.456 * 255, 0.406 * 255 };
+        std::vector<float> std_values{ 0.229 * 255, 0.224 * 255, 0.225 * 255 };
         std::vector<cv::Mat> rgb_channels(3);
         cv::split(blob_image, rgb_channels); // 分离图片数据通道
         for (auto i = 0; i < rgb_channels.size(); i++) {
@@ -321,7 +310,7 @@ extern "C"  __declspec(dllexport) void __stdcall read_infer_result_F32(void* cor
     std::string output_node_name = wchar_to_string(output_node_name_wchar);
     // 读取指定节点的tensor
     const ov::Tensor& output_tensor = p->infer_request.get_tensor(output_node_name);
-    std::cout << " output_tensor.get_shape() ：" << output_tensor.get_shape() << std::endl;
+    // std::cout << " output_tensor.get_shape() ：" << output_tensor.get_shape() << std::endl;
     // 获取网络节点数据地址
     const float* results = output_tensor.data<const float>();
     // 将输出结果复制到输出地址指针中

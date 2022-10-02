@@ -7,10 +7,10 @@ namespace OpenVinoSharpPPTinyPose
     {
         static void Main(string[] args)
         {
-            tiny_pose_image_192();
+            tiny_pose_image();
         }
 
-        public static void tiny_pose_image_192() 
+        public static void tiny_pose_image() 
         {
             //-------------------一、引入模型相关信息------------------//
             // 行人检测模型

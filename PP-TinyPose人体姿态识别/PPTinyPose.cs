@@ -159,7 +159,6 @@ namespace OpenVinoSharpPPTinyPose
                         point_meses[p, 0] = px + (float)error_x;
                         point_meses[p, 1] = py + (float)error_y;
 
-                        Console.WriteLine(point_meses[p, 0] + "  " + point_meses[p, 1] + "  " + point_meses[p, 2]);
                     }
                 }
             }
