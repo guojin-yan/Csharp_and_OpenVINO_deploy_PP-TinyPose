@@ -14,7 +14,7 @@ namespace OpenVinoSharpPPTinyPose
         private string input_node_name = "image";
         private string output_node_name_1 = "concat_8.tmp_0";
         private string output_node_name_2 = "transpose_8.tmp_0";
-        private Size input_image_size = new Size(0,0);
+        private Size input_size = new Size(0,0);
         private int output_length = 0;
 
         public PicoDet(string mode_path, string device_name) {
@@ -23,12 +23,12 @@ namespace OpenVinoSharpPPTinyPose
 
         public void set_shape(Size input_image_size, int output_length) 
         { 
-            this.input_image_size = input_image_size;
+            this.input_size = input_image_size;
             this.output_length = output_length;
         }
 
 
-        public List<Mat> predict(Mat image)
+        public List<Rect> predict(Mat image)
         {
             // 设置图片输入
             // 配置图片数据            
@@ -46,34 +46,37 @@ namespace OpenVinoSharpPPTinyPose
             // 读取模型输出
             // 2125 765
             // 读取置信值结果
-            float[] results_con = predictor.read_infer_result<float>(output_node_name_2, 765);
+            float[] results_con = predictor.read_infer_result<float>(output_node_name_2, output_length);
             // 读取预测框
             float[] result_box = predictor.read_infer_result<float>(output_node_name_1, 4 * output_length);
+
+
+            // 求取缩放大小
+            double scale_x = (double)image.Width / (double)this.input_size.Width;
+            double scale_y = (double)image.Height / (double)this.input_size.Height;
 
             // 处理预测结果
             List<float> confidences = new List<float>();
             List<Rect> boxes = new List<Rect>();
-            for (int c = 0; c < output_length; c++) 
+            for (int c = 0; c < output_length; c++)
             {
-                Rect rect = new Rect((int)result_box[4 * c], (int)result_box[4 * c + 1],
-                    (int)result_box[4 * c + 2] - (int)result_box[4 * c],
-                    (int)result_box[4 * c + 3] - (int)result_box[4 * c + 1]);
+                Rect rect = new Rect((int)(result_box[4 * c] * scale_x), (int)(result_box[4 * c + 1] * scale_y),
+                    (int)((result_box[4 * c + 2] - result_box[4 * c]) * scale_x),
+                    (int)((result_box[4 * c + 3] - result_box[4 * c + 1]) * scale_y));
                 boxes.Add(rect);
                 confidences.Add(results_con[c]);
             }
             // 非极大值抑制获取结果候选框
             int[] indexes = new int[boxes.Count];
-            CvDnn.NMSBoxes(boxes, confidences, 0.25f, 0.45f, out indexes);
-            // 裁剪指定区域
-            List<Mat> out_roi = new List<Mat>();
-            Mat temp_mat = new Mat();
-            Cv2.Resize(image, temp_mat, input_image_size);
-            for (int c = 0; c < indexes.Length; c++)
+            CvDnn.NMSBoxes(boxes, confidences, 0.5f, 0.5f, out indexes);
+            List<Rect> boxes_result = new List<Rect>();
+            for (int i = 0; i < indexes.Length; i++) 
             {
-                Mat roi = new Mat(temp_mat, boxes[indexes[c]]);
-                out_roi.Add(roi);
+                boxes_result.Add(boxes[indexes[i]]);
             }
-            return out_roi;
+            Console.WriteLine(indexes[0]);
+
+            return boxes_result;
         }
 
 

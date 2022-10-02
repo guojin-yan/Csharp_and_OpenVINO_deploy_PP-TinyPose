@@ -30,7 +30,7 @@ namespace OpenVinoSharpPPTinyPose
         }
 
 
-        public void predict(Mat image)
+        public Mat predict(Mat image)
         {
             this.image_size.Width = image.Cols;
             this.image_size.Height = image.Rows;
@@ -68,9 +68,7 @@ namespace OpenVinoSharpPPTinyPose
             float[,] points = new float[17, 3];
             points = process_result(result);
             draw_poses(points, ref image);
-
-            Cv2.ImShow("result", image);
-            Cv2.WaitKey(0);
+            return image;
 
         }
         /// <summary>
@@ -86,12 +84,12 @@ namespace OpenVinoSharpPPTinyPose
             for (int p = 0; p < 17; p++)
             {
                 // 提取一个点结果图像
-                float[,] map = new float[32, 24];
-                for (int h = 0; h < 32; h++) 
+                float[,] map = new float[this.output_size.Width, this.output_size.Height];
+                for (int h = 0; h < this.output_size.Width; h++) 
                 {
-                    for (int w = 0; w < 24; w++) 
+                    for (int w = 0; w < this.output_size.Height; w++) 
                     {
-                        map[h, w] = het_map[p * 32 * 24 + h * 24 + w];
+                        map[h, w] = het_map[p * this.output_size.Width * this.output_size.Height + h * this.output_size.Height + w];
                     }
                 }
                 // 通过获取最大值获得点的粗略位置
@@ -102,22 +100,22 @@ namespace OpenVinoSharpPPTinyPose
                 point_meses[p, 1] = index_int[1];
                 point_meses[p, 2] = maxval;
                 // 高斯滤波细化点位置
-                Mat gaussianblur = Mat.Zeros(32 + 2, 24 + 2,MatType.CV_32FC1); // 高斯图像背景
-                Mat roi = new Mat(new List<int>() { 32, 24 }, MatType.CV_32FC1, map); // 将点结果转为Mat数据
-                Rect rect = new Rect(1,1,24, 32);
+                Mat gaussianblur = Mat.Zeros(this.output_size.Width + 2, this.output_size.Height + 2,MatType.CV_32FC1); // 高斯图像背景
+                Mat roi = new Mat(new List<int>() { this.output_size.Width, this.output_size.Height }, MatType.CV_32FC1, map); // 将点结果转为Mat数据
+                Rect rect = new Rect(1,1, this.output_size.Height, this.output_size.Width);
                 roi.CopyTo(new Mat(gaussianblur, rect)); // 将点结果放在背景上
                 Cv2.GaussianBlur(gaussianblur, gaussianblur, new Size(3, 3), 0); // 高斯滤波
                 gaussianblur = new Mat(gaussianblur, rect); // 提取高斯滤波结果
                 double max_temp = 0;
                 double min_temp = 0;
                 Cv2.MinMaxIdx(gaussianblur, out min_temp, out max_temp); // 获取高斯滤波后的最大值
-                Mat mat = new Mat(32,24,MatType.CV_32FC1, maxval/ max_temp);
+                Mat mat = new Mat(this.output_size.Width, 24,MatType.CV_32FC1, maxval/ max_temp);
                 gaussianblur = gaussianblur.Mul(mat); // 滤波结果乘滤波前后最大值的比值
                 // 将数据小于1e-10去掉，并取对数结果
-                float[,] process_map = new float[32, 24];
-                for (int h = 0; h < 32; h++) 
+                float[,] process_map = new float[this.output_size.Width, this.output_size.Height];
+                for (int h = 0; h < this.output_size.Width; h++) 
                 {
-                    for (int w = 0; w < 24; w++) 
+                    for (int w = 0; w < this.output_size.Height; w++) 
                     {
                         float temp = gaussianblur.At<float>(h, w);
                         if (temp < 1e-10) 
@@ -133,7 +131,7 @@ namespace OpenVinoSharpPPTinyPose
                 // 基于泰勒展开的坐标解码
                 int py = index_int[1];
                 int px = index_int[0];
-                if ((2 < py) && (py < 31) && (2 < px) && (px < 21)) 
+                if ((2 < py) && (py < this.output_size.Width-2) && (2 < px) && (px < this.output_size.Height-2)) 
                 {
                     // 求导数和偏导数
                     float dx = 0.5f * (process_map[py, px + 1] - process_map[py, px - 1]);
@@ -170,7 +168,7 @@ namespace OpenVinoSharpPPTinyPose
             Point center = new Point(this.image_size.Width / 2, this.image_size.Height / 2); // 变换中心点
             Size input_size = new Size(this.image_size.Width, this.image_size.Height); // 输入尺寸
             int rot = 0; // 旋转角度
-            Size output_size = new Size(24, 32); // 输出尺寸
+            Size output_size = new Size(this.output_size.Height, this.output_size.Width); // 输出尺寸
             Mat trans = get_affine_transform(center, input_size, rot, output_size, true); // 变换矩阵
             // 获取变换结果
             double scale_x_1 = trans.At<Vec3d>(0)[0];
@@ -281,9 +279,12 @@ namespace OpenVinoSharpPPTinyPose
                 return Cv2.GetAffineTransform(src, dst);
             }
             
-
         }
-
+        /// <summary>
+        /// 绘制预测结果
+        /// </summary>
+        /// <param name="points"></param>
+        /// <param name="image"></param>
         void draw_poses(float[,] points, ref Mat image)
         {
             // 连接点关系
