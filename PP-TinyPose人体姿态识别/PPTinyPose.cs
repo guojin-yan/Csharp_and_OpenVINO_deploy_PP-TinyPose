@@ -10,13 +10,14 @@ namespace OpenVinoSharpPPTinyPose
 {
     internal class PPTinyPose
     {
-        private Core predictor = null;
-        private string input_node_name = "image";
-        private string output_node_name_1 = "conv2d_441.tmp_1";
-        private string output_node_name_2 = "argmax_0.tmp_0";
-        private Size input_size = new Size(0, 0);
-        private Size output_size = new Size(0, 0);
-        private Size image_size = new Size(0, 0);
+        // 成员变量
+        private Core predictor; // 模型推理器
+        private string input_node_name = "image"; // 模型输入节点名称
+        private string output_node_name_1 = "conv2d_441.tmp_1"; // 模型输出节点名称
+        private string output_node_name_2 = "argmax_0.tmp_0"; // 模型输出节点名称
+        private Size input_size = new Size(0, 0); // 模型输入节点形状
+        private Size output_size = new Size(0, 0); // 模型输出节点形状
+        private Size image_size = new Size(0, 0); // 待推理图片形状
 
         public PPTinyPose(string mode_path, string device_name)
         {
@@ -46,27 +47,19 @@ namespace OpenVinoSharpPPTinyPose
             ulong input_image_length = Convert.ToUInt64(input_image_data.Length);
             // 设置图片输入
             predictor.load_input_data(input_node_name, input_image_data, input_image_length, 2);
-
-            DateTime beginTime = DateTime.Now;            //获取开始时间  
-
             // 模型推理
             predictor.infer();
-
-            DateTime endTime = DateTime.Now;              //获取结束时间  
-            TimeSpan oTime = endTime.Subtract(beginTime); //求时间差的函数  
-            Console.WriteLine("程序的运行时间：{0} 秒", oTime.TotalSeconds);
-
             // 读取模型输出
             //// 2125 765
-            //// 读取置信值结果
-            long[] results_con = predictor.read_infer_result<long>(output_node_name_2, 17);
-
+            //// 读取模型位置输出
+            long[] result_pos = predictor.read_infer_result<long>(output_node_name_2, 17);
+            // 单个预测点数据长度
             int point_size = output_size.Width * output_size.Height;
             // 读取预测结果
             float[] result = predictor.read_infer_result<float>(output_node_name_1, 17 * point_size);
-
-            float[,] points = new float[17, 3];
-            points = process_result(result);
+            // 处理模型输出结果
+            float[,] points = process_result(result);
+            // 绘制人体姿态
             draw_poses(points, ref image);
             return image;
 
@@ -109,7 +102,7 @@ namespace OpenVinoSharpPPTinyPose
                 double max_temp = 0;
                 double min_temp = 0;
                 Cv2.MinMaxIdx(gaussianblur, out min_temp, out max_temp); // 获取高斯滤波后的最大值
-                Mat mat = new Mat(this.output_size.Width, 24,MatType.CV_32FC1, maxval/ max_temp);
+                Mat mat = new Mat(this.output_size.Width, this.output_size.Height, MatType.CV_32FC1, maxval/ max_temp);
                 gaussianblur = gaussianblur.Mul(mat); // 滤波结果乘滤波前后最大值的比值
                 // 将数据小于1e-10去掉，并取对数结果
                 float[,] process_map = new float[this.output_size.Width, this.output_size.Height];
@@ -189,7 +182,7 @@ namespace OpenVinoSharpPPTinyPose
         
 
         /// <summary>
-        /// 获取模型输出中点位置
+        /// 获取模型输出最大点位置
         /// </summary>
         /// <param name="map"></param>
         /// <param name="maxval"></param>
@@ -230,7 +223,7 @@ namespace OpenVinoSharpPPTinyPose
 
 
         /// <summary>
-        /// 获取变换矩阵
+        /// 获取仿射变换矩阵
         /// </summary>
         /// <param name="center">变换中心</param>
         /// <param name="input_size">输入尺寸</param>
@@ -269,15 +262,8 @@ namespace OpenVinoSharpPPTinyPose
             dst[2] = new Point2f(dst[1].X - direction.Y, dst[1].Y - direction.X);
 
             // 是否为反向
-            if (inv) 
-            {
-                return Cv2.GetAffineTransform(dst, src);
-            }
-            else 
-            {
-                return Cv2.GetAffineTransform(src, dst);
-            }
-            
+            if (inv) { return Cv2.GetAffineTransform(dst, src);}
+            else { return Cv2.GetAffineTransform(src, dst);}   
         }
         /// <summary>
         /// 绘制预测结果
@@ -327,6 +313,13 @@ namespace OpenVinoSharpPPTinyPose
                 Cv2.FillConvexPoly(image, polygon, colors[p]);
 
             }
+        }
+        /// <summary>
+        /// 释放推理器内存
+        /// </summary>
+        void dispose() 
+        {
+            predictor.delet();
         }
     }
 }

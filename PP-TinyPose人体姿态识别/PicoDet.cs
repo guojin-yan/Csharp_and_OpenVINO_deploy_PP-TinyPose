@@ -64,12 +64,11 @@ namespace OpenVinoSharpPPTinyPose
 
         private List<Rect> process_result(float[] results_con, float[] result_box, Point2d scale_factor)
         {
-
             // 处理预测结果
             List<float> confidences = new List<float>();
             List<Rect> boxes = new List<Rect>();
             for (int c = 0; c < output_length; c++)
-            {
+            {   // 重新构建
                 Rect rect = new Rect((int)(result_box[4 * c] * scale_factor.X), (int)(result_box[4 * c + 1] * scale_factor.Y),
                     (int)((result_box[4 * c + 2] - result_box[4 * c]) * scale_factor.X),
                     (int)((result_box[4 * c + 3] - result_box[4 * c + 1]) * scale_factor.Y));
@@ -79,13 +78,12 @@ namespace OpenVinoSharpPPTinyPose
             // 非极大值抑制获取结果候选框
             int[] indexes = new int[boxes.Count];
             CvDnn.NMSBoxes(boxes, confidences, 0.5f, 0.5f, out indexes);
+            // 提取合格的预测框
             List<Rect> boxes_result = new List<Rect>();
             for (int i = 0; i < indexes.Length; i++)
             {
                 boxes_result.Add(boxes[indexes[i]]);
             }
-            Console.WriteLine(indexes[0]);
-
             return boxes_result;
         }
 
