@@ -7,7 +7,8 @@ namespace OpenVinoSharpPPTinyPose
     {
         static void Main(string[] args)
         {
-            tiny_pose_image();
+            //tiny_pose_image();
+            Time_text.test_time();
         }
 
         public static void tiny_pose_image() 
