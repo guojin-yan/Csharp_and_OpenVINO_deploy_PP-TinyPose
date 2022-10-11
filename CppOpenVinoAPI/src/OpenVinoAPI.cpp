@@ -291,10 +291,8 @@ extern "C"  __declspec(dllexport) void* __stdcall load_input_data(void* core_ptr
 extern "C"  __declspec(dllexport) void* __stdcall core_infer(void* core_ptr) {
     // 读取推理模型地址
     CoreStruct* p = (CoreStruct*)core_ptr;
-    std::cout << "开始" << std::endl;
     // 模型预测
     p->infer_request.infer();
-    std::cout << "结束" << std::endl;
 
     return (void*)p;
 }
