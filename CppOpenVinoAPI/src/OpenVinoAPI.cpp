@@ -350,7 +350,7 @@ extern "C"  __declspec(dllexport) void __stdcall read_infer_result_I64(void* cor
     std::string output_node_name = wchar_to_string(output_node_name_wchar);
     // 读取指定节点的tensor
     const ov::Tensor& output_tensor = p->infer_request.get_tensor(output_node_name);
-    std::cout << " output_tensor.get_shape() ：" << output_tensor.get_shape() << std::endl;
+    // std::cout << " output_tensor.get_shape() ：" << output_tensor.get_shape() << std::endl;
     // 获取网络节点数据地址
     const long long * results = output_tensor.data<const long long>();
     // 将输出结果赋值到输出地址指针中
