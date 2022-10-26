@@ -10,19 +10,46 @@ namespace OpenVinoSharpPPTinyPose
 {
     internal class Time_text
     {
-        public static void test_time()
+        public static void test_time() 
         {
+            double[] times = new double[8];
+            for (int i = 0; i < 10; i++) 
+            {
+                double[] time = test_time_one();
+                times[0] += time[0];
+                times[1] += time[1];
+                times[2] += time[2];
+                times[3] += time[3];
+                times[4] += time[4];
+                times[5] += time[5];
+                times[6] += time[6];
+                times[7] += time[7];
+            }
+            Console.WriteLine("行人识别：");
+            Console.WriteLine("模型加载运行时间：{0} 毫秒", times[0] / 10);
+            Console.WriteLine("数据加载运行时间：{0} 毫秒", times[1] / 10);
+            Console.WriteLine("模型推理运行时间：{0} 毫秒", times[2] / 10);
+            Console.WriteLine("结果处理运行时间：{0} 毫秒", times[3] / 10);
+            Console.WriteLine("姿态识别：");
+            Console.WriteLine("模型加载运行时间：{0} 毫秒", times[4] / 10);
+            Console.WriteLine("数据加载运行时间：{0} 毫秒", times[5] / 10);
+            Console.WriteLine("模型推理运行时间：{0} 毫秒", times[6] / 10);
+            Console.WriteLine("结果处理运行时间：{0} 毫秒", times[7] / 10);
+        }
+        public static double[] test_time_one()
+        {
+            double[] times = new double[8]; 
             //-------------------一、引入模型相关信息------------------//
             // 行人检测模型
             // ONNX格式
-            // string mode_path_det = @"E:\Text_Model\TinyPose\picodet_v2_s_192_pedestrian\picodet_s_192_lcnet_pedestrian.onnx";
-            string mode_path_det = @"E:\Text_Model\TinyPose\picodet_v2_s_320_pedestrian\picodet_s_320_lcnet_pedestrian.onnx";
-
+            //string mode_path_det = @"E:\Text_Model\TinyPose\picodet_v2_s_320_pedestrian\picodet_s_320_lcnet_pedestrian.onnx";
+            //string mode_path_det = @"E:\Text_Model\TinyPose\picodet_v2_s_320_pedestrian\ir\picodet_s_320_lcnet_pedestrian.xml";
+            string mode_path_det = @"E:\Text_Model\TinyPose\picodet_v2_s_320_pedestrian\ir_fp16\picodet_s_320_lcnet_pedestrian.xml";
             // 关键点检测模型
-            // onnx格式
-            //string mode_path_pose = @"E:\Text_Model\TinyPose\tinypose_128_96\tinypose_128_96.onnx";
-            string mode_path_pose = @"E:\Text_Model\TinyPose\tinypose_256_192\tinypose_256x192.onnx";
-
+            // ir格式
+            //string mode_path_pose = @"E:\Text_Model\TinyPose\tinypose_256_192\ir\model.xml";
+            string mode_path_pose = @"E:\Text_Model\TinyPose\tinypose_256_192\ir_fp16\model.xml";
+            //string mode_path_pose = @"E:\Text_Model\TinyPose\tinypose_256_192\tinypose_256_192.onnx";
             // 设备名称
             string device_name = "CPU";
 
@@ -41,8 +68,8 @@ namespace OpenVinoSharpPPTinyPose
             TimeSpan oTime = end.Subtract(begin); //求时间差的函数  
 
             //输出运行时间。  
-            Console.WriteLine("模型加载运行时间：{0} 毫秒", oTime.TotalMilliseconds);
-
+            // Console.WriteLine("模型加载运行时间：{0} 毫秒", oTime.TotalMilliseconds);
+            times[0] = oTime.TotalMilliseconds;
 
             string input_node_name_det = "image"; // 模型输入节点名称
             string output_node_name_1_det = "concat_8.tmp_0"; // 模型预测框输出节点名
@@ -59,9 +86,9 @@ namespace OpenVinoSharpPPTinyPose
             predictor_det.load_input_data(input_node_name_det, input_image_data_det, input_image_length_det, 0);
             end = DateTime.Now;
             //输出运行时间。  
-            
             oTime = end.Subtract(begin); //求时间差的函数  
-            Console.WriteLine("数据加载运行时间：{0} 毫秒", oTime.TotalMilliseconds);
+            // Console.WriteLine("数据加载运行时间：{0} 毫秒", oTime.TotalMilliseconds);
+            times[1] = oTime.TotalMilliseconds;
             // 求取缩放大小
             double scale_x = (double)image.Width / (double)input_size_det.Width;
             double scale_y = (double)image.Height / (double)input_size_det.Height;
@@ -71,7 +98,8 @@ namespace OpenVinoSharpPPTinyPose
             predictor_det.infer();
             end = DateTime.Now;      
             oTime = end.Subtract(begin); //求时间差的函数  
-            Console.WriteLine("模型推理运行时间：{0} 毫秒", oTime.TotalMilliseconds);
+            //Console.WriteLine("模型推理运行时间：{0} 毫秒", oTime.TotalMilliseconds);
+            times[2] = oTime.TotalMilliseconds;
             begin = DateTime.Now;
             // 读取模型输出
             // 2125 765
@@ -83,8 +111,9 @@ namespace OpenVinoSharpPPTinyPose
             List<Rect> boxes_result = process_result_det(results_con, result_box, scale_factor);
             end = DateTime.Now;
             oTime = end.Subtract(begin); //求时间差的函数  
-            Console.WriteLine("结果处理运行时间：{0} 毫秒", oTime.TotalMilliseconds);
-
+            //Console.WriteLine("结果处理运行时间：{0} 毫秒", oTime.TotalMilliseconds);
+            times[3] = oTime.TotalMilliseconds;
+            predictor_det.delet();
             //------------------二、姿态识别-------------------------------//
 
             begin = DateTime.Now;
@@ -92,13 +121,14 @@ namespace OpenVinoSharpPPTinyPose
             Core predictor = new Core(mode_path_pose, device_name); // 模型推理器
             end = DateTime.Now;
             oTime = end.Subtract(begin); //求时间差的函数  
-            Console.WriteLine("模型加载运行时间：{0} 毫秒", oTime.TotalMilliseconds);
-
+            //Console.WriteLine("模型加载运行时间：{0} 毫秒", oTime.TotalMilliseconds);
+            times[4] = oTime.TotalMilliseconds;
 
             string input_node_name = "image"; // 模型输入节点名称
             string output_node_name_1 = "conv2d_441.tmp_1"; // 模型输出节点名称
             string output_node_name_2 = "argmax_0.tmp_0"; // 模型输出节点名称
             Size input_size = new Size(256, 192); // 模型输入节点形状
+            // Size input_size = new Size(128, 96); // 模型输入节点形状
             Size output_size = new Size(input_size.Width / 4, input_size.Height / 4); // 模型输出节点形状
             Size image_size = new Size(0, 0); // 待推理图片形状
 
@@ -120,13 +150,15 @@ namespace OpenVinoSharpPPTinyPose
             predictor.load_input_data(input_node_name, input_image_data, input_image_length, 2);
             end = DateTime.Now;
             oTime = end.Subtract(begin); //求时间差的函数  
-            Console.WriteLine("数据加载运行时间：{0} 毫秒", oTime.TotalMilliseconds);
+            //Console.WriteLine("数据加载运行时间：{0} 毫秒", oTime.TotalMilliseconds);
+            times[5] = oTime.TotalMilliseconds;
             begin = DateTime.Now;
             // 模型推理
             predictor.infer();
             end = DateTime.Now;
             oTime = end.Subtract(begin); //求时间差的函数  
-            Console.WriteLine("模型推理运行时间：{0} 毫秒", oTime.TotalMilliseconds);
+            //Console.WriteLine("模型推理运行时间：{0} 毫秒", oTime.TotalMilliseconds);
+            times[6] = oTime.TotalMilliseconds;
             begin = DateTime.Now;
             // 读取模型输出
             //// 2125 765
@@ -142,9 +174,10 @@ namespace OpenVinoSharpPPTinyPose
             draw_poses(points, ref image);
             end = DateTime.Now;
             oTime = end.Subtract(begin); //求时间差的函数  
-            Console.WriteLine("数据处理运行时间：{0} 毫秒", oTime.TotalMilliseconds);
-
-
+            //Console.WriteLine("数据处理运行时间：{0} 毫秒", oTime.TotalMilliseconds);
+            times[7] = oTime.TotalMilliseconds;
+            predictor.delet();
+            return times;
         }
 
 

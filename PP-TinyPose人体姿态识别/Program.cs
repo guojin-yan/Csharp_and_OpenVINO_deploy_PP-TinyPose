@@ -7,8 +7,8 @@ namespace OpenVinoSharpPPTinyPose
     {
         static void Main(string[] args)
         {
-            tiny_pose_image();
-            //Time_text.test_time();
+            // tiny_pose_image();
+            Time_text.test_time();
         }
 
         public static void tiny_pose_image() 
@@ -17,7 +17,7 @@ namespace OpenVinoSharpPPTinyPose
             // 行人检测模型
             // ONNX格式
             // string mode_path_det = @"E:\Text_Model\TinyPose\picodet_v2_s_192_pedestrian\picodet_s_192_lcnet_pedestrian.onnx";
-            string mode_path_det = @"E:\Text_Model\TinyPose\picodet_v2_s_320_pedestrian\picodet_s_320_lcnet_pedestrian.onnx";
+            string mode_path_det = @"E:\Text_Model\TinyPose\picodet_v2_s_320_pedestrian\ir\picodet_s_320_lcnet_pedestrian.xml";
 
             // 关键点检测模型
             // onnx格式
