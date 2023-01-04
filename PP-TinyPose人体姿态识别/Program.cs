@@ -7,8 +7,8 @@ namespace OpenVinoSharpPPTinyPose
     {
         static void Main(string[] args)
         {
-            // tiny_pose_image();
-            Time_text.test_time();
+            tiny_pose_image();
+            // Time_text.test_time();
         }
 
         public static void tiny_pose_image() 
@@ -21,15 +21,15 @@ namespace OpenVinoSharpPPTinyPose
 
             // 关键点检测模型
             // onnx格式
-            string mode_path_pose = @"E:\Text_Model\TinyPose\tinypose_128_96\tinypose_128_96.onnx";
-            //string mode_path_pose = @"E:\Text_Model\TinyPose\tinypose_256_192\tinypose_256x192.onnx";
+            // string mode_path_pose = @"E:\Text_Model\TinyPose\tinypose_128_96\tinypose_128_96.onnx";
+            string mode_path_pose = @"E:\Text_Model\TinyPose\tinypose_256_192\tinypose_256_192.onnx";
 
             // 设备名称
             string device_name = "CPU";
 
 
             // 测试图片
-            string image_path = @"E:\Git_space\基于Csharp和OpenVINO部署PP-TinyPose\image\demo_2.jpg";
+            string image_path = @"E:\Git_space\基于Csharp和OpenVINO部署PP-TinyPose\image\demo_7.jpg";
 
             Mat image = Cv2.ImRead(image_path);
 
@@ -48,21 +48,29 @@ namespace OpenVinoSharpPPTinyPose
             //Cv2.Rectangle(image, result_rect[0], new Scalar(255, 0, 0), 2);
 
             //Cv2.ImShow("result", image);
-
+            //Cv2.WaitKey(0);
             ////---------------------三、人体姿势检测--------------------//
             PPTinyPose tiny_pose = new PPTinyPose(mode_path_pose, device_name);
-            Size size_pose = new Size(128, 96);
-            // Size size_pose = new Size(256, 192);
+            // Size size_pose = new Size(128, 96);
+            Size size_pose = new Size(256, 192);
             tiny_pose.set_shape(size_pose);
 
+            List<Rect> point_rects;
+            List<Mat> person_rois = tiny_pose.get_point_roi(image, result_rect, out point_rects);
 
-            Mat result_image = tiny_pose.predict(image);
+            for (int p = 0; p < person_rois.Count; p++)
+            {
+                // 关键点识别
+                float[,] person_point = tiny_pose.predict(person_rois[p]);
+
+                tiny_pose.draw_poses(person_point, point_rects[p], ref image);
+            }
 
             for (int i = 0; i < result_rect.Count; i++)
             {
-                Cv2.Rectangle(result_image, result_rect[i], new Scalar(255, 0, 0), 2);
+                Cv2.Rectangle(image, result_rect[i], new Scalar(255, 0, 0), 2);
             }
-            Cv2.ImShow("result", result_image);
+            Cv2.ImShow("result", image);
             Cv2.WaitKey(0);
 
         }
