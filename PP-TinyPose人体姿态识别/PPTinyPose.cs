@@ -31,7 +31,7 @@ namespace OpenVinoSharpPPTinyPose
         }
 
 
-        public Mat predict(Mat image)
+        public float[,] predict(Mat image)
         {
             this.image_size.Width = image.Cols;
             this.image_size.Height = image.Rows;
@@ -59,11 +59,56 @@ namespace OpenVinoSharpPPTinyPose
             float[] result = predictor.read_infer_result<float>(output_node_name_1, 17 * point_size);
             // 处理模型输出结果
             float[,] points = process_result(result);
-            // 绘制人体姿态
-            draw_poses(points, ref image);
-            return image;
+           
+            return points;
 
         }
+
+
+        /// <summary>
+        /// 裁剪关键点识别区域
+        /// </summary>
+        /// <param name="source_image">原图片</param>
+        /// <param name="rects">矩形区域数组</param>
+        /// <returns>文字区域mat</returns>
+        public List<Mat> get_point_roi(Mat source_image, List<Rect> person_rects, out List<Rect> point_rects)
+        {
+            Mat image = source_image.Clone();
+            List<Mat> rois = new List<Mat>();
+            point_rects = new List<Rect>();
+
+            for (int r = 0; r < person_rects.Count; r++)
+            {
+                Point locate = person_rects[r].Location;
+                int width = person_rects[r].Width;
+                int height = person_rects[r].Height;
+                double centre_X = locate.X + width * 0.5;
+                double centre_Y = locate.Y + height * 0.5;
+                double nwidth = width * 1.3;
+                double nheight = height * 1.3;
+                if (nheight > (nwidth * 4.0 / 3.0))
+                {
+                    nwidth = nheight * 0.75;
+                }
+                Rect rect_new = new Rect((int)(centre_X - 0.5 * nwidth),
+                    (int)(centre_Y - 0.5 * nheight), (int)nwidth, (int)nheight);
+
+                int x_min = Math.Max(0, rect_new.X);
+                int x_max = Math.Min(source_image.Cols - 1, rect_new.X + rect_new.Width);
+                int y_min = Math.Max(0, rect_new.Y);
+                int y_max = Math.Min(source_image.Rows - 1, rect_new.Y + rect_new.Height);
+
+                Rect rect = new Rect(x_min, y_min, x_max - x_min, y_max - y_min);
+
+                //Rect rect = get_IOU(sourse_rect, rect_new);
+                Mat roi = new Mat(image, rect);
+                rois.Add(roi);
+                point_rects.Add(rect);
+            }
+            return rois;
+
+        }
+
         /// <summary>
         /// 处理关键点预测结果
         /// </summary>
@@ -270,7 +315,7 @@ namespace OpenVinoSharpPPTinyPose
         /// </summary>
         /// <param name="points"></param>
         /// <param name="image"></param>
-        void draw_poses(float[,] points, ref Mat image)
+        public void draw_poses(float[,] points, Rect bboxs, ref Mat image)
         {
             // 连接点关系
             int[,] edgs = new int[17, 2] { { 0, 1 }, { 0, 2}, {1, 3}, {2, 4}, {3, 5}, {4, 6}, {5, 7}, {6, 8},
@@ -286,6 +331,8 @@ namespace OpenVinoSharpPPTinyPose
             // 绘制关键点
             for (int p = 0; p < 17; p++)
             {
+                points[p, 0] = points[p, 0] + bboxs.X;
+                points[p, 1] = points[p, 1] + bboxs.Y;
                 if (points[p, 2] < visual_thresh) 
                 {
                     continue;
